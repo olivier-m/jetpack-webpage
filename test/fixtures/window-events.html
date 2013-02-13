@@ -1,0 +1,37 @@
+<!DOCTYPE HTML>
+<html lang="en-US">
+<head>
+  <meta charset="UTF-8" />
+  <title>Window features</title>
+
+  <script type="text/javascript">
+  // Testing all window features
+
+  back();
+  close();
+  forward();
+  home();
+  open("http://google.com/");
+  openDialog("http://google.com/");
+  showModalDialog("http://google.com/");
+  print();
+
+  alert("Hello");
+  var _confirm = confirm("Confirm box");
+  var _prompt = prompt("Prompt dialog");
+  dump("Dump");
+  console.log("Log");
+
+  // THAT is dirty :)
+  window.onbeforeunload = function() {
+    return "beforeunload";
+  };
+  window.onunload = function() {
+    return "unload";
+  };
+  </script>
+</head>
+
+<body>
+</body>
+</html>
