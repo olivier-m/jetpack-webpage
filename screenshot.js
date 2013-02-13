@@ -11,20 +11,38 @@ const NS = "http://www.w3.org/1999/xhtml";
 const COLOR = "rgb(255,255,255)";
 
 
-const getScreenshotCanvas = function(window) {
-    // TODO: resize window before screenshot and provides clipping and ratio
-    let width = window.document.body.offsetWidth;
-    let height = window.document.body.scrollHeight;// + window.scrollMaxY;
+const getScreenshotCanvas = function(window, clip, ratio) {
+    let scrollbarWidth = 0;
+    scrollbarWidth = window.innerWidth - window.document.body.clientWidth;
+
+    if (clip) {
+        window.resizeTo(clip.width + scrollbarWidth, clip.height);
+    }
+    if (!ratio || (ratio && (ratio <= 0 || ratio > 1))) {
+        ratio = 1;
+    }
+
+    let top = clip && clip.top || 0;
+    let left = clip && clip.left || 0;
+    let width = clip && clip.width;
+    let height = clip && clip.height || window.document.body.scrollHeight;
+
+    if (width === null) {
+        width = window.document.body.clientWidth;
+    }
 
     let canvas = AppShellService.hiddenDOMWindow.document.createElementNS(NS, "canvas");
-
     canvas.mozOpaque = true;
-    canvas.width = width;
-    canvas.height = height;
+    canvas.width = Math.round(width * ratio);
+    canvas.height = Math.round(height * ratio);
 
     let ctx = canvas.getContext("2d");
-    ctx.scale(1,1);
-    ctx.drawWindow(window, window.scrollX, window.scrollY, width, height, COLOR);
+    ctx.fillStyle = COLOR;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.save();
+    ctx.scale(ratio, ratio);
+    ctx.drawWindow(window, left, top, width, height, COLOR);
+    ctx.restore();
 
     return canvas;
 };

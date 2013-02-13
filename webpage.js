@@ -9,6 +9,7 @@ const Q = require("sdk/core/promise");
 const {getBrowserForTab, getOwnerWindow} = require("sdk/tabs/utils");
 const {descriptor} = require("toolkit/loader");
 
+const {validateOptions} = require("sdk/deprecated/api-utils");
 const {EventEmitter} = require("sdk/deprecated/events");
 const {Trait} = require("sdk/deprecated/traits");
 
@@ -211,6 +212,8 @@ const webPage = EventEmitter.compose(ListenerTrait(), WindowEventTrait(),
         this._plainText = "";
     },
 
+    _clipRect: null,
+
     constructor: function(options) {
         this.trait = tabs.TabTrait(options);
         this._state = "closed";
@@ -230,6 +233,49 @@ const webPage = EventEmitter.compose(ListenerTrait(), WindowEventTrait(),
                 this._plainText = response.body;
             }
         }.bind(this));
+    },
+
+    activate: function() {
+        this._assertTab();
+        let deferred = Q.defer();
+        this.trait.once("select", function() {
+            deferred.resolve();
+        });
+        this.trait.select();
+        return deferred.promise;
+    },
+
+    get clipRect() {
+        return this._clipRect;
+    },
+    set clipRect(value) {
+        let requirements = {
+            top: {
+                is: ["number"],
+                ok: function(val) val >= 0,
+                msg: "top should be a positive integer"
+            },
+            left: {
+                is: ["number"],
+                ok: function(val) val >= 0,
+                msg: "left should be a positive integer"
+            },
+            width: {
+                is: ["number"],
+                ok: function(val) val > 0,
+                msg: "width should be a positive integer"
+            },
+            height: {
+                is: ["number"],
+                ok: function(val) val > 0,
+                msg: "height should be a positive integer"
+            },
+        }
+        if (typeof(value) === "object") {
+            this._clipRect = validateOptions(value, requirements);
+        } else {
+            this._clipRect = null;
+        }
     },
 
     close: function() {
@@ -326,15 +372,15 @@ const webPage = EventEmitter.compose(ListenerTrait(), WindowEventTrait(),
         return deferred.promise;
     },
 
-    render: function(filename) {
+    render: function(filename, ratio) {
         throw new Error("Not implemented yet");
     },
 
-    renderBytes: function(format) {
-        return base64.decode(this.renderBase64(format));
+    renderBytes: function(format, ratio) {
+        return base64.decode(this.renderBase64(format, ratio));
     },
 
-    renderBase64: function(format) {
+    renderBase64: function(format, ratio) {
         this._assertTab();
 
         format = (format || "png").toString().toLowerCase();
@@ -349,7 +395,8 @@ const webPage = EventEmitter.compose(ListenerTrait(), WindowEventTrait(),
         }
 
         let window = getBrowserForTab(this._tab).contentWindow;
-        let canvas = getScreenshotCanvas(window);
+
+        let canvas = getScreenshotCanvas(window, this.clipRect, ratio);
 
         return canvas.toDataURL(format, qual).split(",", 2)[1];
     },

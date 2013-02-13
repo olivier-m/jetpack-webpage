@@ -4,7 +4,7 @@
 "use strict";
 
 const {Cc, Ci} = require("chrome");
-const {getBrowserForTab, getOwnerWindow} = require("sdk/tabs/utils");
+const {activateTab, getBrowserForTab, getOwnerWindow} = require("sdk/tabs/utils");
 const {setTimeout, clearTimeout} = require("sdk/timers");
 
 const {validateOptions} = require("sdk/deprecated/api-utils");
@@ -32,6 +32,7 @@ netLog.startTracer();
 const E_OPEN = "open";
 const E_OPEN_READY = "openReady";
 const E_CLOSE = "close";
+const E_SELECT = "select";
 
 const E_INIT = "init";
 const E_START = "start";
@@ -76,6 +77,7 @@ const TabTrait = Trait.compose(EventEmitter, {
         this._onLoad = this._bindListener(this._onLoad);
         this._onFullLoad = this._bindListener(this._onFullLoad);
         this._onClose = this._bindListener(this._onClose);
+        this._onSelect = this._bindListener(this._onSelect);
 
         this.mainWindow = wm.getMostRecentWindow("navigator:browser");
         this.container = this.mainWindow.gBrowser.tabContainer;
@@ -174,6 +176,10 @@ const TabTrait = Trait.compose(EventEmitter, {
         this.container.removeEventListener("TabClose", this._onClose, true);
         this._emit(E_CLOSE);
     },
+    _onSelect: function() {
+        this.tab.removeEventListener("TabSelect", this._onActivate, true);
+        this._emit(E_SELECT);
+    },
 
     _load: function(url) {
         // Register netLog
@@ -188,6 +194,14 @@ const TabTrait = Trait.compose(EventEmitter, {
         this.once("start", this._onLoadStart);
         this._plistener = new ProgressListener(this);
         this.browser.addProgressListener(this._plistener, progressFlags);
+    },
+
+    select: function() {
+        if (this.tab === null) {
+            return;
+        }
+        this.container.addEventListener("TabSelect", this._onSelect, true);
+        activateTab(this.tab);
     },
 
     open: function() {
