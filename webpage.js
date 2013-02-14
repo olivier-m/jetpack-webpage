@@ -235,7 +235,7 @@ const webPage = EventEmitter.compose(ListenerTrait(), WindowEventTrait(),
         }.bind(this));
     },
 
-    activate: function() {
+    foreground: function() {
         this._assertTab();
         let deferred = Q.defer();
         this.trait.once("select", function() {

@@ -4,7 +4,7 @@
 "use strict";
 
 const {Cc, Ci} = require("chrome");
-const {activateTab, getBrowserForTab, getOwnerWindow} = require("sdk/tabs/utils");
+const {getBrowserForTab, getOwnerWindow, getTabBrowserForTab} = require("sdk/tabs/utils");
 const {setTimeout, clearTimeout} = require("sdk/timers");
 
 const {validateOptions} = require("sdk/deprecated/api-utils");
@@ -200,8 +200,14 @@ const TabTrait = Trait.compose(EventEmitter, {
         if (this.tab === null) {
             return;
         }
+        let gBrowser = getTabBrowserForTab(this.tab);
+        if (gBrowser.selectedTab == this.tab) {
+            this._emit(E_SELECT);
+            return;
+        }
+
         this.container.addEventListener("TabSelect", this._onSelect, true);
-        activateTab(this.tab);
+        gBrowser.selectedTab = this.tab;
     },
 
     open: function() {
