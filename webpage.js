@@ -207,6 +207,16 @@ const webPage = EventEmitter.compose(ListenerTrait(), WindowEventTrait(),
         return this._sandbox;
     },
 
+    get globals() {
+        return this._sandboxGlobals;
+    },
+    set globals(value) {
+        if (this._sandbox !== null) {
+            throw new Error("Cannot add globals after the first evaluation call");
+        }
+        this._sandboxGlobals = value;
+    },
+
     _cleanUp: function() {
         // Init & clean some vars
         this._plainText = "";

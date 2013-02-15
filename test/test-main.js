@@ -42,13 +42,20 @@ exports["test open promise"] = function(assert, done) {
 exports["test evaluate"] = function(assert, done) {
     let p = webpage.create();
     p.open(pageURL("/base.html"), function(status) {
+        p.globals = {
+            "fooVar": "bar"
+        };
         assert.equal(status, "success");
         let title = p.evaluate(function() {
             return document.title;
         });
         assert.equal(title, "Test page");
 
-        let v = p.evaluate(function() { return testVar; });
+        assert.equal(1, p.evaluate(function() { return testVar; }));
+        assert.equal("bar", p.evaluate(function() { return fooVar; }));
+        assert.throws(function() {
+            p.globals = {"test": 1};
+        });
 
         p.close().then(done);
     });
