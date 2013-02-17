@@ -4,9 +4,12 @@
 "use strict";
 
 const {Cc, Ci, Cu} = require("chrome");
+const base64 = require("sdk/base64");
 
 const AppShellService = Cc["@mozilla.org/appshell/appShellService;1"]
                         .getService(Ci.nsIAppShellService);
+const ioService = Cc["@mozilla.org/network/io-service;1"]
+                        .getService(Ci.nsIIOService);
 const STS = Cc["@mozilla.org/stsservice;1"]
                         .getService(Ci.nsIStrictTransportSecurityService);
 
@@ -64,3 +67,34 @@ const discardSTSInfo = function(request) {
     }
 };
 exports.discardSTSInfo = discardSTSInfo;
+
+
+const setAuthHeaders = function(request, originURL, username, password) {
+    try {
+        request.QueryInterface(Ci.nsIHttpChannel);
+    } catch(e) {}
+
+    // Remove auth info in any case
+    request.setRequestHeader("Authorization", null, false);
+
+    if (!username && !password) {
+        return;
+    }
+    let auth = "Basic " + base64.encode(username + ":" + password);
+
+    // No referer = original page, set it
+    if (request.referrer === null) {
+        request.setRequestHeader("Authorization", auth, false);
+        return;
+    }
+
+    // Resources, test hostname and base path
+    let url = ioService.newURI(originURL, null, null);
+    if (url.host == request.URI.host &&
+        url.port == request.URI.port &&
+        url.scheme == request.URI.scheme
+    ) {
+        request.setRequestHeader("Authorization", auth, false);
+    }
+};
+exports.setAuthHeaders = setAuthHeaders;

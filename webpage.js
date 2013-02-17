@@ -15,7 +15,7 @@ const {Trait} = require("sdk/deprecated/traits");
 
 const {tabSandbox} = require("./sandbox");
 const tabs = require("./tabs");
-const {discardSTSInfo, getScreenshotCanvas} = require("utils");
+const {discardSTSInfo, getScreenshotCanvas, setAuthHeaders} = require("utils");
 
 const ListenerTrait = function() {
     // PhantomJS callback we can convert to events
@@ -222,13 +222,23 @@ const webPage = EventEmitter.compose(ListenerTrait(), WindowEventTrait(),
         this._plainText = "";
     },
 
-    _clipRect: null,
-
     constructor: function(options) {
         this.trait = tabs.TabTrait(options);
         this._state = "closed";
         this._sandbox = null;
         this._sandboxGlobals = null;
+
+        this._clipRect = null;
+        this._settings = {
+            javascriptEnabled: true,
+            loadImages: true,
+            localToRemoteUrlAccessEnabled: false,
+            userAgent: null,
+            userName: null,
+            password: null,
+            XSSAuditingEnabled: false,
+            webSecurityEnabled: true
+        };
 
         this._cleanUp();
 
@@ -246,9 +256,14 @@ const webPage = EventEmitter.compose(ListenerTrait(), WindowEventTrait(),
         }.bind(this));
 
         // Remove STS information on each response for tab
-        this.trait.on("_response", function(request) {
-            discardSTSInfo(request);
+        this.trait.on("_response", function(response) {
+            discardSTSInfo(response);
         });
+
+        // Set authorization on each request
+        this.trait.on("_request", function(request) {
+            setAuthHeaders(request, this.url, this.settings.userName, this.settings.password);
+        }.bind(this));
     },
 
     foreground: function() {
@@ -425,6 +440,15 @@ const webPage = EventEmitter.compose(ListenerTrait(), WindowEventTrait(),
         } catch(e) {
             this._emit("error", e);
             return "";
+        }
+    },
+
+    get settings() {
+        return this._settings;
+    },
+    set settings(val) {
+        if (typeof(val) === "object") {
+            this._settings = mix(this._settings, val);
         }
     },
 

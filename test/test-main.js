@@ -1,5 +1,6 @@
 "use strict";
 
+const Q = require("sdk/core/promise");
 const {URL} = require("sdk/url");
 const {readBinaryURI, registerFile, startServer} = require("net-log/test/utils");
 
@@ -122,13 +123,55 @@ exports["test window events"] = function(assert, done) {
     });
 };
 
-exports["tests options"] = function(assert, done) {
+exports["test options"] = function(assert, done) {
     let p = webpage.create({startTimeout: 0});
 
     p.open(pageURL("/base.html"))
     .then(function(status) {
         assert.equal(status, "fail");
         p.close().then(done);
+    });
+};
+
+exports["test auth"] = function(assert, done) {
+    let grabAuth = function(request) {
+        request.headers.forEach(function(v) {
+            if (v[0] == "Authorization") {
+                this.push(v[1]);
+            }
+        }.bind(this));
+    };
+
+    let p1 = webpage.create();
+    let auth1 = [];
+
+    p1.settings.userName = "foo";
+    p1.settings.password = "bar";
+
+    p1.on('resourceRequested', grabAuth.bind(auth1));
+
+    let prom1 = p1.open(pageURL("/base.html"))
+    .then(function(status) {
+        assert.equal(auth1.length, 2);
+        assert.equal(auth1[0], "Basic Zm9vOmJhcg==");
+        assert.equal(auth1[1], "Basic Zm9vOmJhcg==");
+        p1.close();
+    });
+
+    let p2 = webpage.create();
+    let auth2 = [];
+
+    p2.on('resourceRequested', grabAuth.bind(auth2));
+
+    let prom2 = p2.open(pageURL("/base.html"))
+    .then(function(status) {
+        // On the same URL but without auth, it should not mix with p1
+        assert.equal(auth2.length, 0);
+        p2.close();
+    });
+
+    Q.promised(Array)(prom1, prom2).then(function() {
+        done();
     });
 };
 
