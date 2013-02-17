@@ -72,7 +72,9 @@ exports.discardSTSInfo = discardSTSInfo;
 const setAuthHeaders = function(request, originURL, username, password) {
     try {
         request.QueryInterface(Ci.nsIHttpChannel);
-    } catch(e) {}
+    } catch(e) {
+        return;
+    }
 
     // Remove auth info in any case
     request.setRequestHeader("Authorization", null, false);

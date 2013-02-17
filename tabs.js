@@ -4,7 +4,6 @@
 "use strict";
 
 const {Cc, Ci} = require("chrome");
-const events = require("sdk/system/events");
 const {getBrowserForTab, getOwnerWindow, getTabBrowserForTab} = require("sdk/tabs/utils");
 const {setTimeout, clearTimeout} = require("sdk/timers");
 
@@ -81,8 +80,6 @@ const TabTrait = Trait.compose(EventEmitter, {
         this._onFullLoad = this._bindListener(this._onFullLoad);
         this._onClose = this._bindListener(this._onClose);
         this._onSelect = this._bindListener(this._onSelect);
-        this._onRequest = this._bindListener(this._onRequest);
-        this._onResponse = this._bindListener(this._onResponse);
 
         this.mainWindow = wm.getMostRecentWindow("navigator:browser");
         this.container = this.mainWindow.gBrowser.tabContainer;
@@ -95,17 +92,6 @@ const TabTrait = Trait.compose(EventEmitter, {
         this.on("load", this._cleanUp);
         this.on("loadFail", this._cleanUp);
         this.on("error", this._cleanUp);
-
-        this.on("open", function() {
-            events.on("http-on-modify-request", this._onRequest);
-            events.on("http-on-examine-response", this._onResponse);
-            events.on("http-on-examine-cached-response", this._onResponse);
-        }.bind(this));
-        this.on("close", function() {
-            events.off("http-on-modify-request", this._onRequest);
-            events.off("http-on-examine-response", this._onResponse);
-            events.off("http-on-examine-cached-response", this._onResponse);
-        }.bind(this));
     },
 
     get tab() {
@@ -135,18 +121,6 @@ const TabTrait = Trait.compose(EventEmitter, {
         }
     },
 
-    _onRequest: function(evt) {
-        let request = evt.subject;
-        if (netLog.getBrowserForRequest(request) === this._browser) {
-            this._emit(E_REQUEST, request);
-        }
-    },
-    _onResponse: function(evt) {
-        let request = evt.subject;
-        if (netLog.getBrowserForRequest(request) === this._browser) {
-            this._emit(E_RESPONSE, request);
-        }
-    },
     _onOpen: function(evt) {
         this.container.removeEventListener("TabOpen", this._onOpen, true);
 
@@ -275,6 +249,12 @@ const registerBrowserNetLog = function(trait) {
         },
         onResponse: function(response) {
             trait._emit(E_RES_REC, response);
+        },
+        _onRequest: function(subject) {
+            trait._emit(E_REQUEST, subject);
+        },
+        _onResponse: function(subject) {
+            trait._emit(E_RESPONSE, subject);
         }
     });
 };
