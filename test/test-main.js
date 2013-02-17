@@ -17,7 +17,7 @@ startServer(port, URL("fixtures/", module.uri).toString(), [
 ]);
 
 const pageURL = function(path) {
-    return "http://127.0.0.1:" + port + path;
+    return "http://localhost:" + port + path;
 };
 
 
@@ -171,6 +171,61 @@ exports["test auth"] = function(assert, done) {
     });
 
     Q.promised(Array)(prom1, prom2).then(function() {
+        done();
+    });
+};
+
+exports["test cookies"] = function(assert, done) {
+    let p = webpage.create();
+
+    assert.deepEqual(p.cookies, []);
+
+    assert.throws(function() {
+        p.addCookie({});
+    });
+    assert.throws(function() {
+        p.addCookie({
+            name: "foo",
+            value: "bar"
+        });
+    });
+
+    p.addCookie({
+        name: "foo",
+        value: "bar",
+        domain: ".example.com"
+    });
+    assert.equal(p.cookies.length, 1);
+
+    p.addCookie({
+        name: "woot",
+        value: "foo",
+        domain: ".example.net"
+    });
+    assert.equal(p.cookies.length, 2);
+    assert.equal(p.cookies[1].value, "foo");
+
+    p.addCookie({
+        name: "woot",
+        value: "foo2",
+        domain: ".example.net"
+    });
+    assert.equal(p.cookies.length, 2);
+    assert.equal(p.cookies[1].value, "foo2");
+
+    assert.throws(function() {
+        p.cookies = [{name:"test"}];
+    });
+    assert.equal(p.cookies.length, 2);
+
+    p.addCookie({
+        name: "test",
+        value: "cookieTest",
+        domain: "localhost"
+    });
+
+    p.open(pageURL("/base.html"))
+    .then(function() {
         done();
     });
 };

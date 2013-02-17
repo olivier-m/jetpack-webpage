@@ -15,7 +15,7 @@ const {Trait} = require("sdk/deprecated/traits");
 
 const {tabSandbox} = require("./sandbox");
 const tabs = require("./tabs");
-const {discardSTSInfo, getScreenshotCanvas, setAuthHeaders} = require("utils");
+const {discardSTSInfo, getScreenshotCanvas, setAuthHeaders, Cookie} = require("utils");
 
 const ListenerTrait = function() {
     // PhantomJS callback we can convert to events
@@ -229,6 +229,7 @@ const webPage = EventEmitter.compose(ListenerTrait(), WindowEventTrait(),
         this._sandboxGlobals = null;
 
         this._clipRect = null;
+        this._cookies = [];
         this._settings = {
             javascriptEnabled: true,
             loadImages: true,
@@ -274,6 +275,40 @@ const webPage = EventEmitter.compose(ListenerTrait(), WindowEventTrait(),
         });
         this.trait.select();
         return deferred.promise;
+    },
+
+    addCookie: function(cookie) {
+        cookie = Cookie(cookie);
+        this._cookies = this._cookies.filter(function(v) {
+            return v.name !== cookie.name;
+        });
+
+        this._cookies.push(cookie);
+        return true;
+    },
+    clearCookies: function(cookie) {
+        this._cookies = [];
+    },
+    deleteCookie: function(name) {
+        this._cookies = this._cookies.filter(function(v) {
+            return v.name !== cookie.name;
+        });
+    },
+    get cookies() {
+        return this._cookies;
+    },
+    set cookies(values) {
+        values = Array.isArray(values) && values || [];
+        let old = this._cookies;
+        this.clearCookies();
+        try {
+            values.forEach(function(v) {
+                this.addCookie(v);
+            });
+        } catch(e) {
+            this._cookies = old;
+            throw e;
+        }
     },
 
     get clipRect() {

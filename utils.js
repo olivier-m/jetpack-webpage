@@ -5,6 +5,10 @@
 
 const {Cc, Ci, Cu} = require("chrome");
 const base64 = require("sdk/base64");
+const {mix} = require("sdk/core/heritage");
+const {URL} = require("sdk/url");
+
+const {validateOptions} = require("sdk/deprecated/api-utils");
 
 const AppShellService = Cc["@mozilla.org/appshell/appShellService;1"]
                         .getService(Ci.nsIAppShellService);
@@ -100,3 +104,98 @@ const setAuthHeaders = function(request, originURL, username, password) {
     }
 };
 exports.setAuthHeaders = setAuthHeaders;
+
+
+function Cookie(data) {
+    let requirements = {
+        name: {
+            is: ["string"],
+        },
+        value: {
+            map: function(val) val.toString(),
+            ok: function(val) val != "",
+            msg: "cookie value is required"
+        },
+        domain: {
+            is: ["string"],
+        },
+        path: {
+            map: function(val) val && val.toString() || "/"
+        },
+        httponly: {
+            map: function(val) typeof(val) === "boolean" ? val : true,
+        },
+        secure: {
+            map: function(val) typeof(val) === "boolean" ? val : false,
+        },
+        expires: {
+            map: function(val) !val ? null : val,
+            ok: function(val) val === undefined || val === null || val instanceof Date,
+            msg: "expires should be a Date, null, undefined"
+        }
+    };
+
+    data = validateOptions(data, requirements);
+
+    return mix(data, {
+        check: function(url) {
+            url = URL(url);
+            return this._checkHost(url) && this._checkPath(url);
+        },
+        _checkHost: function(url) {
+            if (this.domain.indexOf('.') == 0) {
+                return (
+                    this.domain.length < url.host.length &&
+                    url.host.substr(url.host.length - this.domain.length) == this.domain
+                );
+            }
+            return this.domain == url.host;
+        },
+        _checkPath: function(url) {
+            return url.path.indexOf(this.path) === 0;
+        }
+    });
+};
+exports.Cookie = Cookie;
+
+function parseCookie(cookieString, url) {
+    url = URL(url);
+    let data = {
+        domain: url.host,
+        httponly: false,
+        secure: false
+    };
+    cookieString.split(";").forEach(function(v, i, p) {
+        v = v.trim();
+        let eq = v.indexOf("=");
+        let name, value, expires;
+        if (eq == -1) {
+            name = v;
+            value = true;
+        } else {
+            name = v.slice(0, eq);
+            value = v.slice(eq + 1);
+        }
+
+        if (i == 0) {
+            data.name = name;
+            data.value = decodeURIComponent(value);
+        } else if (name.toLowerCase() == "domain") {
+            data.domain = value;
+        } else if (name.toLowerCase() == "path") {
+            data.path = value;
+        } else if (name.toLowerCase() == "expires") {
+            expires = Date.parse(value.replace("-", " ", "g"));
+            if (expires > 0) {
+                data.expires = new Date(expires);
+            }
+        } else if (name.toLowerCase() == "httponly") {
+            data.httponly = true;
+        } else if (name.toLowerCase() == "secure" && url.scheme === "https") {
+            data.secure = true;
+        }
+    });
+
+    return Cookie(data);
+};
+exports.parseCookie = parseCookie;
