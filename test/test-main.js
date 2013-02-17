@@ -34,6 +34,7 @@ exports["test open promise"] = function(assert, done) {
     let p = webpage.create();
     p.open(pageURL("/lorem.txt")).then(function(status) {
         assert.equal(status, "success");
+        assert.equal(p.url, pageURL("/lorem.txt"));
     }).then(function() {
         p.close().then(done);
     });
@@ -50,6 +51,7 @@ exports["test evaluate"] = function(assert, done) {
             return document.title;
         });
         assert.equal(title, "Test page");
+        assert.equal(p.url, pageURL("/base.html"));
 
         assert.equal(1, p.evaluate(function() { return testVar; }));
         assert.equal("bar", p.evaluate(function() { return fooVar; }));

@@ -17,7 +17,6 @@ const {tabSandbox} = require("./sandbox");
 const tabs = require("./tabs");
 const {getScreenshotCanvas} = require("screenshot");
 
-
 const ListenerTrait = function() {
     // PhantomJS callback we can convert to events
     const EVENTS = [
@@ -190,6 +189,7 @@ const webPage = EventEmitter.compose(ListenerTrait(), WindowEventTrait(),
     get _tab() {
         return this.trait.tab;
     },
+
     get sandbox() {
         this._assertTab();
         if (this._sandbox === null) {
@@ -229,6 +229,7 @@ const webPage = EventEmitter.compose(ListenerTrait(), WindowEventTrait(),
         this._state = "closed";
         this._sandbox = null;
         this._sandboxGlobals = null;
+
         this._cleanUp();
 
         // Create event listeners
@@ -347,6 +348,7 @@ const webPage = EventEmitter.compose(ListenerTrait(), WindowEventTrait(),
         }
         this._cleanUp();
         this._state = "transfer";
+
         let deferred = Q.defer();
 
         this.trait.once("load", function() {
@@ -419,6 +421,11 @@ const webPage = EventEmitter.compose(ListenerTrait(), WindowEventTrait(),
             this._emit("error", e);
             return "";
         }
+    },
+
+    get url() {
+        this._assertTab();
+        return this._tab.linkedBrowser.contentWindow.location.href;
     }
 });
 
