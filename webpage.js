@@ -15,7 +15,7 @@ const {Trait} = require("sdk/deprecated/traits");
 
 const {tabSandbox} = require("./sandbox");
 const tabs = require("./tabs");
-const {getScreenshotCanvas} = require("screenshot");
+const {discardSTSInfo, getScreenshotCanvas} = require("utils");
 
 const ListenerTrait = function() {
     // PhantomJS callback we can convert to events
@@ -244,6 +244,11 @@ const webPage = EventEmitter.compose(ListenerTrait(), WindowEventTrait(),
                 this._plainText = response.body;
             }
         }.bind(this));
+
+        // Remove STS information on each response for tab
+        this.trait.on("_response", function(request) {
+            discardSTSInfo(request);
+        });
     },
 
     foreground: function() {

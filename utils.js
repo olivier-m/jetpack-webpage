@@ -3,9 +3,12 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 "use strict";
 
-const { Cc, Ci, Cu } = require("chrome");
-const AppShellService = Cc["@mozilla.org/appshell/appShellService;1"].
-                                                getService(Ci.nsIAppShellService);
+const {Cc, Ci, Cu} = require("chrome");
+
+const AppShellService = Cc["@mozilla.org/appshell/appShellService;1"]
+                        .getService(Ci.nsIAppShellService);
+const STS = Cc["@mozilla.org/stsservice;1"]
+                        .getService(Ci.nsIStrictTransportSecurityService);
 
 const NS = "http://www.w3.org/1999/xhtml";
 const COLOR = "rgb(255,255,255)";
@@ -47,3 +50,17 @@ const getScreenshotCanvas = function(window, clip, ratio) {
     return canvas;
 };
 exports.getScreenshotCanvas = getScreenshotCanvas;
+
+
+const discardSTSInfo = function(request) {
+    try {
+        request.QueryInterface(Ci.nsIHttpChannel);
+    } catch(e) {
+        return;
+    }
+
+    if (STS.isStsHost(request.URI.host)) {
+        STS.removeStsState(request.URI);
+    }
+};
+exports.discardSTSInfo = discardSTSInfo;
