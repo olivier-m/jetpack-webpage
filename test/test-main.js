@@ -23,6 +23,24 @@ srv.registerPathHandler("/cookie", function(request, response) {
     response.write("test");
     response.finish();
 });
+srv.registerPathHandler("/auth", function(request, response) {
+    response.setHeader("Content-Type", "text/plain; charset=UTF-8", false);
+
+    if (request.hasHeader("Authorization") &&
+        request.getHeader("Authorization") === "Basic Zm9vOmJhcg==")
+    {
+        response.setStatusLine(request.httpVersion, 200, "OK");
+        response.processAsync();
+        response.write("ok");
+        response.finish();
+    } else {
+        response.setStatusLine(request.httpVersion, 401, "Unauthorized");
+        response.setHeader("WWW-Authenticate", "Basic realm=\"password please\"");
+        response.processAsync();
+        response.write("unauthorized");
+        response.finish();
+    }
+});
 
 const pageURL = function(path) {
     return "http://localhost:" + port + path;
@@ -174,6 +192,25 @@ exports["test auth"] = function(assert, done) {
 
         // On the same URL but without auth, it should not mix with p1
         assert.equal(auth2.length, 0);
+        done();
+    });
+};
+
+exports["test authenticated"] = function(assert, done) {
+    let p = webpage.create();
+
+    p.open(pageURL("/auth"))
+    .then(function(result) {
+        assert.equal(p.plainText, "unauthorized");
+
+        p.settings.userName = "foo";
+        p.settings.password = "bar";
+
+        return p.open(p.url);
+    })
+    .then(function(result) {
+        assert.equal(p.plainText, "ok");
+        p.close();
         done();
     });
 };
