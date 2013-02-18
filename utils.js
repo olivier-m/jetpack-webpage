@@ -118,7 +118,7 @@ const setCookies = function(request, cookies) {
 
     cookies.forEach(function(cookie) {
         if (cookie.check(request.URI.spec)) {
-            request.setRequestHeader("Cookie", cookie.toString(), true);
+            request.setRequestHeader("Cookie", cookie.name + "=" + cookie.value, true);
         }
     });
 

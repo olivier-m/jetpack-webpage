@@ -249,8 +249,8 @@ exports["test cookies"] = function(assert, done) {
 
     Q.promised(Array)(prom1, prom2, prom3).then(function() {
         assert.equal(c1.length, 2);
-        assert.equal(c1[0], p1.cookies[2].toString());
-        assert.equal(c1[1], p1.cookies[2].toString());
+        assert.equal(c1[0], p1.cookies[2].name + "=" + p1.cookies[2].value);
+        assert.equal(c1[1], p1.cookies[2].name + "=" + p1.cookies[2].value);
 
         assert.equal(c2.length, 0);
 
