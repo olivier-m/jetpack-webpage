@@ -22,6 +22,7 @@ exports["test domain"] = function(assert) {
         domain: ".example.com"
     });
 
+    assert.equal(cookie.check("http://example.com/"), true);
     assert.equal(cookie.check("http://www.example.com/"), true);
     assert.equal(cookie.check("http://images.example.com/"), true);
     assert.equal(cookie.check("http://www.testexample.com/"), false);
@@ -38,6 +39,20 @@ exports["test path"] = function(assert) {
     assert.equal(cookie.check("http://www.example.net/"), false);
     assert.equal(cookie.check("http://www.example.net/test/"), true);
     assert.equal(cookie.check("http://www.example.net/test/foo"), true);
+};
+
+exports["test sec"] = function(assert) {
+    let cookie = Cookie({
+        name: "test",
+        value: 1,
+        domain: ".example.net",
+        path: "/",
+        httponly: true,
+        secure: true
+    });
+
+    assert.equal(cookie.check("http://example.net/"), false);
+    assert.equal(cookie.check("https://example.net/"), true);
 };
 
 exports["test perm"] = function(assert) {

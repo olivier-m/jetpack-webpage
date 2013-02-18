@@ -106,6 +106,44 @@ const setAuthHeaders = function(request, originURL, username, password) {
 exports.setAuthHeaders = setAuthHeaders;
 
 
+const setCookies = function(request, cookies) {
+    try {
+        request.QueryInterface(Ci.nsIHttpChannel);
+    } catch(e) {
+        return;
+    }
+
+    // Remove cookies on original page
+    request.setRequestHeader("Cookie", null, false);
+
+    cookies.forEach(function(cookie) {
+        if (cookie.check(request.URI.spec)) {
+            request.setRequestHeader("Cookie", cookie.toString(), true);
+        }
+    });
+
+};
+exports.setCookies = setCookies;
+
+
+const getCookies = function(request) {
+    try {
+        request.QueryInterface(Ci.nsIHttpChannel);
+    } catch(e) {
+        return [];
+    }
+    try {
+        let cookies = request.getResponseHeader("Set-Cookie").split("\n");
+        return cookies.map(function(cookie) {
+            return parseCookie(cookie, request.URI.spec);
+        });
+    } catch(e) {
+        return [];
+    }
+};
+exports.getCookies = getCookies;
+
+
 function Cookie(data) {
     let requirements = {
         name: {
@@ -138,18 +176,44 @@ function Cookie(data) {
     data = validateOptions(data, requirements);
 
     return mix(data, {
+        toString: function() {
+            let res = [this.name + "=" + this.value];
+            if (this.domain) {
+                res.push("domain=" + this.domain);
+            }
+            if (this.path) {
+                res.push("path=" + this.path);
+            }
+            if (this.expires) {
+                res.push("expires=" + this.expires.toUTCString());
+            }
+            if (this.httponly) {
+                res.push("httponly");
+            }
+            if (this.secure) {
+                res.push("secure");
+            }
+
+            return res.join("; ");
+        },
         check: function(url) {
             url = URL(url);
-            return this._checkHost(url) && this._checkPath(url);
+            return this._checkHost(url) && this._checkPath(url) && this._checkSec(url);
         },
         _checkHost: function(url) {
             if (this.domain.indexOf('.') == 0) {
-                return (
+                return this.domain.substr(1) === url.host || (
                     this.domain.length < url.host.length &&
                     url.host.substr(url.host.length - this.domain.length) == this.domain
                 );
             }
             return this.domain == url.host;
+        },
+        _checkSec: function(url) {
+            return (
+                (!this.httponly || (this.httponly && ["http", "https"].indexOf(url.scheme) !== -1)) &&
+                (!this.secure || (this.secure && url.scheme === "https"))
+            );
         },
         _checkPath: function(url) {
             return url.path.indexOf(this.path) === 0;

@@ -15,7 +15,7 @@ const {Trait} = require("sdk/deprecated/traits");
 
 const {tabSandbox} = require("./sandbox");
 const tabs = require("./tabs");
-const {discardSTSInfo, getScreenshotCanvas, setAuthHeaders, Cookie} = require("utils");
+const {discardSTSInfo, getScreenshotCanvas, setAuthHeaders, getCookies, setCookies, Cookie} = require("./utils");
 
 const ListenerTrait = function() {
     // PhantomJS callback we can convert to events
@@ -256,14 +256,22 @@ const webPage = EventEmitter.compose(ListenerTrait(), WindowEventTrait(),
             }
         }.bind(this));
 
-        // Remove STS information on each response for tab
-        this.trait.on("_response", function(response) {
-            discardSTSInfo(response);
-        });
-
-        // Set authorization on each request
         this.trait.on("_request", function(request) {
+            // Set authorization
             setAuthHeaders(request, this.url, this.settings.userName, this.settings.password);
+
+            // Set cookies
+            setCookies(request, this._cookies);
+        }.bind(this));
+
+        this.trait.on("_response", function(response) {
+            // Remove STS information on each response for tab
+            discardSTSInfo(response);
+
+            // Add cookies to internal jar
+            getCookies(response).forEach(function(cookie) {
+                this.addCookie(cookie);
+            }.bind(this));
         }.bind(this));
     },
 
