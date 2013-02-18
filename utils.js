@@ -16,6 +16,8 @@ const ioService = Cc["@mozilla.org/network/io-service;1"]
                         .getService(Ci.nsIIOService);
 const STS = Cc["@mozilla.org/stsservice;1"]
                         .getService(Ci.nsIStrictTransportSecurityService);
+const wm = Cc["@mozilla.org/appshell/window-mediator;1"]
+                        .getService(Ci.nsIWindowMediator);
 
 const NS = "http://www.w3.org/1999/xhtml";
 const COLOR = "rgb(255,255,255)";
@@ -104,6 +106,35 @@ const setAuthHeaders = function(request, originURL, username, password) {
     }
 };
 exports.setAuthHeaders = setAuthHeaders;
+
+
+const removeAuthPrompt = function() {
+    // Ok, this one is very ugly and we should look at a better idea :)
+    let winEnum = wm.getXULWindowEnumerator(null, true);
+    let win, dcEnum, ds, doc;
+    while (winEnum.hasMoreElements()) {
+        try {
+            win = winEnum.getNext();
+            win.QueryInterface(Ci.nsIXULWindow);
+
+            dcEnum = win.docShell.getDocShellEnumerator(
+                Ci.nsIDocShellTreeItem.typeChrome,
+                Ci.nsIDocShell.ENUMERATE_FORWARDS
+            );
+            while (dcEnum.hasMoreElements()) {
+                ds = dcEnum.getNext();
+                ds.QueryInterface(Ci.nsIDocShell);
+                doc = ds.contentViewer.DOMDocument;
+                if (doc.location.href == "chrome://global/content/commonDialog.xul") {
+                    doc.documentElement._buttons.cancel.click();
+                };
+            }
+        } catch(e) {
+            // Didn't read, LOL
+        }
+    }
+};
+exports.removeAuthPrompt = removeAuthPrompt;
 
 
 const setCookies = function(request, cookies) {

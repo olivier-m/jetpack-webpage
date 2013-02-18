@@ -7,6 +7,7 @@ const base64 = require("sdk/base64");
 const {mix} = require("sdk/core/heritage");
 const Q = require("sdk/core/promise");
 const {getBrowserForTab, getOwnerWindow} = require("sdk/tabs/utils");
+const {setTimeout} = require("sdk/timers");
 const {descriptor} = require("toolkit/loader");
 
 const {validateOptions} = require("sdk/deprecated/api-utils");
@@ -15,7 +16,10 @@ const {Trait} = require("sdk/deprecated/traits");
 
 const {tabSandbox} = require("./sandbox");
 const tabs = require("./tabs");
-const {discardSTSInfo, getScreenshotCanvas, setAuthHeaders, getCookies, setCookies, Cookie} = require("./utils");
+const {
+    discardSTSInfo, getScreenshotCanvas, setAuthHeaders, removeAuthPrompt,
+    getCookies, setCookies, Cookie
+} = require("./utils");
 
 const ListenerTrait = function() {
     // PhantomJS callback we can convert to events
@@ -272,6 +276,11 @@ const webPage = EventEmitter.compose(ListenerTrait(), WindowEventTrait(),
             getCookies(response).forEach(function(cookie) {
                 this.addCookie(cookie);
             }.bind(this));
+
+            // Remove auth prompt
+            if (response.responseStatus == 401) {
+                setTimeout(removeAuthPrompt, 100);
+            }
         }.bind(this));
     },
 
