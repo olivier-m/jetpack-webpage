@@ -136,8 +136,8 @@ exports["test options"] = function(assert, done) {
 exports["test auth"] = function(assert, done) {
     let grabAuth = function(request) {
         request.headers.forEach(function(v) {
-            if (v[0] == "Authorization") {
-                this.push(v[1]);
+            if (v.name == "Authorization") {
+                this.push(v.value);
             }
         }.bind(this));
     };
