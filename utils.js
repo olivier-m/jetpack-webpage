@@ -69,7 +69,7 @@ const discardSTSInfo = function(request) {
     }
 
     if (STS.isStsHost(request.URI.host, null)) {
-        STS.removeStsState(request.URI);
+        STS.removeStsState(request.URI, null);
     }
 };
 exports.discardSTSInfo = discardSTSInfo;
