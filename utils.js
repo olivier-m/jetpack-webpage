@@ -68,7 +68,7 @@ const discardSTSInfo = function(request) {
         return;
     }
 
-    if (STS.isStsHost(request.URI.host)) {
+    if (STS.isStsHost(request.URI.host, null)) {
         STS.removeStsState(request.URI);
     }
 };
