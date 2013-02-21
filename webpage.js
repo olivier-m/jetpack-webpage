@@ -80,6 +80,7 @@ const ListenerTrait = function() {
         redir("error");
         redir("openReady", "initialized");
         redir("start", "loadStarted");
+        redir("ready", "loadContent");
         redir("resourceRequested");
         redir("resourceReceived");
 
@@ -423,7 +424,7 @@ const webPage = EventEmitter.compose(ListenerTrait(), WindowEventTrait(),
 
         let deferred = Q.defer();
 
-        this.trait.once("load", function() {
+        this.trait.once("fullLoad", function() {
             this._state = "complete";
             deferred.resolve("success");
         }.bind(this));

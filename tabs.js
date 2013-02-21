@@ -39,6 +39,7 @@ const E_START = "start";
 const E_LOAD_START = "loadStart";
 const E_READY = "ready";
 const E_LOAD = "load";
+const E_FULL_LOAD = "fullLoad";
 const E_REQUEST = "_request";
 const E_RESPONSE = "_response";
 
@@ -168,11 +169,12 @@ const TabTrait = Trait.compose(EventEmitter, {
             clearTimeout(this._timeout);
             this._timeout = null;
         }
+        this._emit(E_LOAD);
 
         setTimeout(this._onFullLoad, this.options.loadWait);
     },
     _onFullLoad: function() {
-        this._emit(E_LOAD);
+        this._emit(E_FULL_LOAD);
     },
     _onClose: function() {
         this.container.removeEventListener("TabClose", this._onClose, true);
