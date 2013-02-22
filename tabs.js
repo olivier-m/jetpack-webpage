@@ -90,8 +90,8 @@ const TabTrait = Trait.compose(EventEmitter, {
         this._timeout = null;
 
         // Unregister browser on load, loadFail and error
-        this.on("load", this._cleanUp);
-        this.on("loadFail", this._cleanUp);
+        this.on(E_FULL_LOAD, this._cleanUp);
+        this.on(E_LOAD_FAIL, this._cleanUp);
         this.on("error", this._cleanUp);
     },
 
