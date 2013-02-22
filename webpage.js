@@ -280,7 +280,7 @@ const webPage = EventEmitter.compose(ListenerTrait(), WindowEventTrait(),
 
             // Remove auth prompt
             if (response.responseStatus == 401) {
-                setTimeout(removeAuthPrompt, 100);
+                setTimeout(removeAuthPrompt, 500);
             }
         }.bind(this));
     },
@@ -447,6 +447,10 @@ const webPage = EventEmitter.compose(ListenerTrait(), WindowEventTrait(),
         } else {
             this.trait.load(url);
         }
+
+        deferred.promise.then(function(result) {
+            this._emit("openFinished", result);
+        }.bind(this));
 
         if (typeof(callback) === "function") {
             deferred.promise.then(callback).then(null, function(e) {
