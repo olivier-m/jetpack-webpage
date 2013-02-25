@@ -225,6 +225,7 @@ const webPage = EventEmitter.compose(ListenerTrait(), WindowEventTrait(),
     _cleanUp: function() {
         // Init & clean some vars
         this._plainText = "";
+        this._sandbox = null;
     },
 
     constructor: function(options) {
