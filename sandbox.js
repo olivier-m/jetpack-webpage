@@ -5,8 +5,10 @@
 
 const file = require("sdk/io/file")
 const sandbox = require("sdk/loader/sandbox");
+const {readURISync} = require('sdk/net/url');
 const {Request} = require("sdk/request");
 const timers = require("sdk/timers");
+
 
 const tabSandbox = function(tab) {
     let win = tab.linkedBrowser.contentWindow;
@@ -23,7 +25,7 @@ tabSandbox.prototype = {
 
     getCode: function(func) {
         let args = JSON.stringify(Array.prototype.slice.call(arguments).slice(1));
-        return "(" + func.toSource() + ").apply(null, " + args + ")";
+        return "(" + func.toSource() + ").apply(this, " + args + ")";
     },
 
     evaluate: function(func) {
@@ -55,8 +57,10 @@ tabSandbox.prototype = {
     injectJS: function(filename) {
         let code = null;
         try {
-            let fp = file.open(filename, "r");
-            code = fp.read();
+            if (filename.indexOf("/") === 0) {
+                filename = "file://" + filename;
+            }
+            code = readURISync(filename);
         } catch(e) {
             throw new Error("Unable to open file \"" + filename + "\".");
         }
