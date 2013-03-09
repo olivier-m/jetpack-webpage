@@ -168,11 +168,10 @@ const WindowEventTrait = function() {
 
         // Default console message
         this.onConsoleMessage = function(id, args) {
-            if (typeof(console[id]) === "function") {
-                return console[id].apply(null, args);
-            } else {
-                return console.info.apply(null, [id].concat(args));
+            if (id === "log") {
+                id = "info";
             }
+            dump(id + ": " + args.join(" ") + "\n");
         };
     };
 
