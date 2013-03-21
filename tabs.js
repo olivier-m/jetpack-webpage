@@ -219,11 +219,7 @@ const Tab = Class({
                     emit(this, E_LOAD);
                     setTimeout(fullLoad, this.options.loadWait);
                 }
-            }.bind(this),
-
-            onStateChange: function(progress, request, flags, status, isMain) {
-                //if (isMain) console.log(this.debugFlags(flags))
-            }
+            }.bind(this)
         };
 
         let startWait = function() {

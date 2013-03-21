@@ -80,6 +80,7 @@ const ListenerTrait = function() {
 
         redir('error');
         redir('openReady', 'initialized');
+        redir('init', 'loadInit');
         redir('start', 'loadStarted');
         redir('ready', 'loadContent');
         redir('resourceRequested');
