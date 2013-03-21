@@ -1,70 +1,65 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
-"use strict";
+'use strict';
 
-const {Cc, Ci} = require("chrome");
-const {getBrowserForTab, getOwnerWindow, getTabBrowserForTab} = require("sdk/tabs/utils");
-const {setTimeout, clearTimeout} = require("sdk/timers");
+const {Cc, Ci} = require('chrome');
 
-const {validateOptions} = require("sdk/deprecated/api-utils");
-const {EventEmitter} = require("sdk/deprecated/events");
-const {Trait} = require("sdk/deprecated/traits");
+const {Class, mix} = require('sdk/core/heritage');
+const {emit} = require('sdk/event/core');
+const {EventTarget} = require('sdk/event/target');
+const {getBrowserForTab, getOwnerWindow, getTabBrowserForTab} = require('sdk/tabs/utils');
+const {setTimeout, clearTimeout} = require('sdk/timers');
 
-const netLog = require("net-log");
+const {validateOptions} = require('sdk/deprecated/api-utils');
 
-const wm = Cc["@mozilla.org/appshell/window-mediator;1"].getService(Ci.nsIWindowMediator);
+const NetLog = require('net-log/net-log');
+const PageProgress = require('net-log/page-progress');
 
-const loadFlags = (
+const wm = Cc['@mozilla.org/appshell/window-mediator;1'].getService(Ci.nsIWindowMediator);
+
+const LOAD_FLAGS = (
     Ci.nsIWebNavigation.LOAD_FLAGS_BYPASS_CACHE
     | Ci.nsIWebNavigation.LOAD_FLAGS_BYPASS_HISTORY
     | Ci.nsIWebNavigation.LOAD_FLAGS_FIRST_LOAD
     | Ci.nsIWebNavigation.LOAD_FLAGS_STOP_CONTENT
 );
-const progressFlags = (
-    Ci.nsIWebProgress.NOTIFY_STATE_DOCUMENT
-    | Ci.nsIWebProgress.NOTIFY_STATE_WINDOW
-);
-
-netLog.startTracer();
 
 // Tab events definition
-const E_OPEN = "open";
-const E_OPEN_READY = "openReady";
-const E_CLOSE = "close";
-const E_SELECT = "select";
+const E_OPEN = 'open';
+const E_OPEN_READY = 'openReady';
+const E_CLOSE = 'close';
+const E_SELECT = 'select';
 
-const E_INIT = "init";
-const E_START = "start";
-const E_LOAD_START = "loadStart";
-const E_READY = "ready";
-const E_LOAD = "load";
-const E_FULL_LOAD = "fullLoad";
-const E_REQUEST = "_request";
-const E_RESPONSE = "_response";
+const E_INIT = 'init';
+const E_START = 'start';
+const E_LOAD_START = 'loadStart';
+const E_READY = 'ready';
+const E_LOAD = 'load';
+const E_FULL_LOAD = 'fullLoad';
+const E_REQUEST = '_request';
+const E_RESPONSE = '_response';
 
-const E_LOAD_FAIL = "loadFail";
-const E_RES_REQ = "resourceRequested";
-const E_RES_REC = "resourceReceived";
+const E_LOAD_FAIL = 'loadFail';
+const E_RES_REQ = 'resourceRequested';
+const E_RES_REC = 'resourceReceived';
 
 
-const TabTrait = Trait.compose(EventEmitter, {
-    on: Trait.required,
-    once: Trait.required,
-    _emit: Trait.required,
+const Tab = Class({
+    extends: EventTarget,
 
-    constructor: function(options) {
+    initialize: function(options) {
         let requirements = {
             startTimeout: {
-                map: function(val) typeof(val) === "number" ? parseInt(val) : 5000,
+                map: function(val) typeof(val) === 'number' ? parseInt(val) : 5000,
                 ok: function(val) val >= 0
             },
             loadTimeout: {
-                map: function(val) typeof(val) === "number" ? parseInt(val) : 30000,
+                map: function(val) typeof(val) === 'number' ? parseInt(val) : 30000,
                 ok: function(val) val >= 0
             },
             loadWait: {
-                map: function(val) typeof(val) === "number" ? parseInt(val) : 500,
+                map: function(val) typeof(val) === 'number' ? parseInt(val) : 500,
                 ok: function(val) val >= 0
             },
             captureTypes: {
@@ -73,26 +68,16 @@ const TabTrait = Trait.compose(EventEmitter, {
         };
         this.options = validateOptions(options, requirements);
 
-        this._onOpen = this._bindListener(this._onOpen);
-        this._onOpenReady = this._bindListener(this._onOpenReady);
-        this._onLoadStart = this._bindListener(this._onLoadStart);
-        this._onReady = this._bindListener(this._onReady);
-        this._onLoad = this._bindListener(this._onLoad);
-        this._onFullLoad = this._bindListener(this._onFullLoad);
-        this._onClose = this._bindListener(this._onClose);
-        this._onSelect = this._bindListener(this._onSelect);
-
-        this.mainWindow = wm.getMostRecentWindow("navigator:browser");
+        this.mainWindow = wm.getMostRecentWindow('navigator:browser');
         this.container = this.mainWindow.gBrowser.tabContainer;
         this._browser = null;
         this._tab = null;
-        this._plistener = null;
         this._timeout = null;
 
         // Unregister browser on load, loadFail and error
         this.on(E_FULL_LOAD, this._cleanUp);
         this.on(E_LOAD_FAIL, this._cleanUp);
-        this.on("error", this._cleanUp);
+        this.on('error', this._cleanUp);
     },
 
     get tab() {
@@ -102,228 +87,185 @@ const TabTrait = Trait.compose(EventEmitter, {
         return this._browser;
     },
 
-    _bindListener: function(listener) {
-        return function() {
-            try {
-                listener.apply(this, arguments);
-            } catch(e) {
-                this._emit("error", e);
-            }
-        }.bind(this);
-    },
-
     _cleanUp: function() {
+        if (this._timeout) {
+            clearTimeout(this._timeout);
+            this._timeout = null;
+        }
         if (this.browser) {
-            this.browser.stop();
-            netLog.unregisterBrowser(this.browser);
-            try {
-                this.browser.removeProgressListener(this._plistener);
-            } catch(e) {}
+            if (typeof(this.browser.stop) === 'function') {
+                this.browser.stop();
+            }
+            NetLog.unregisterBrowser(this.browser);
+            PageProgress.unregisterBrowser(this.browser);
         }
     },
 
-    _onOpen: function(evt) {
-        this.container.removeEventListener("TabOpen", this._onOpen, true);
-
-        this._tab = evt.target;
-        this._browser = getBrowserForTab(this.tab);
-
-        this._emit(E_OPEN, this.tab);
-
-        this.browser.addEventListener("DOMContentLoaded", this._onOpenReady, true);
-    },
-    _onOpenReady: function(evt) {
-        this.browser.removeEventListener("DOMContentLoaded", this._onOpenReady, true);
-        this._emit(E_OPEN_READY, this.tab);
-    },
-    _onLoadStart: function() {
-        let startTimeout = this._bindListener(function() {
-            this.browser.removeEventListener("DOMContentLoaded", this._onReady, true);
-            this._emit(E_LOAD_FAIL, "Start timeout");
-        });
-        this._timeout = setTimeout(startTimeout, this.options.startTimeout);
-        this.browser.addEventListener("DOMContentLoaded", this._onReady, true);
-    },
-    _onReady: function() {
-        this.browser.removeEventListener("DOMContentLoaded", this._onReady, true);
-        if (this._timeout) {
-            clearTimeout(this._timeout);
-            this._timeout = null;
-        }
-        this._emit(E_READY);
-
-        let loadTimeout = this._bindListener(function() {
-            this.browser.contentWindow.removeEventListener("load", this._onLoad, true);
-            this._emit(E_LOAD_FAIL, "Load timeout");
-        });
-        this._timeout = setTimeout(loadTimeout, this.options.loadTimeout);
-        this.browser.contentWindow.addEventListener("load", this._onLoad, true);
-    },
-    _onLoad: function() {
-        this.browser.contentWindow.removeEventListener("load", this._onLoad, true);
-        try {
-            this.browser.removeProgressListener(this._plistener);
-        } catch(e) {}
-
-        if (this._timeout) {
-            clearTimeout(this._timeout);
-            this._timeout = null;
-        }
-        this._emit(E_LOAD);
-
-        setTimeout(this._onFullLoad, this.options.loadWait);
-    },
-    _onFullLoad: function() {
-        this._emit(E_FULL_LOAD);
-    },
-    _onClose: function() {
-        this.container.removeEventListener("TabClose", this._onClose, true);
-        this._emit(E_CLOSE);
-    },
-    _onSelect: function() {
-        this.tab.removeEventListener("TabSelect", this._onActivate, true);
-        this._emit(E_SELECT);
-    },
-
-    _load: function(url) {
-        // Register netLog
-        registerBrowserNetLog(this);
-
-        // Open URI
-        this.browser.stop();
-        this._emit(E_INIT);
-        this.browser.loadURIWithFlags(url, loadFlags, null, null, null);
-
-        // Add progress & start event listeners
-        this.once("start", this._onLoadStart);
-        this._plistener = new ProgressListener(this);
-        this.browser.addProgressListener(this._plistener, progressFlags);
-    },
 
     select: function() {
         if (this.tab === null) {
             return;
         }
         let gBrowser = getTabBrowserForTab(this.tab);
-        if (gBrowser.selectedTab == this.tab) {
-            this._emit(E_SELECT);
-            return;
-        }
+        let onSelect = function() {
+            this.container.removeEventListener('TabSelect', onSelect, true);
+            emit(this, E_SELECT);
+        }.bind(this);
 
-        this.container.addEventListener("TabSelect", this._onSelect, true);
-        gBrowser.selectedTab = this.tab;
+        if (gBrowser.selectedTab === this.tab) {
+            emit(this, E_SELECT);
+        }
+        else {
+            this.container.addEventListener('TabSelect', onSelect, true);
+            gBrowser.selectedTab = this.tab;
+        }
     },
 
     open: function() {
-        this.container.addEventListener("TabOpen", this._onOpen, true);
-        this.mainWindow.gBrowser.addTab();
-    },
-    close: function() {
-        if (this.tab) {
-            this.browser.stop();
-            this.container.addEventListener("TabClose", this._onClose, true);
-            getOwnerWindow(this.tab).gBrowser.removeTab(this.tab);
-        }
-    },
-    load: function(url) {
-        // This wrapper will first replace current browser URL with about:blank
-        // and then load the given URL.
-        // There were some issues with a brutal URL switch.
+        let _onOpen = bindListener(this, function(evt) {
+            this.container.removeEventListener('TabOpen', _onOpen, true);
 
-        let _ready = this._bindListener(function() {
-            this.browser.removeEventListener("DOMContentLoaded", _ready, true);
-            this._load(url);
+            this._tab = evt.target;
+            this._browser = getBrowserForTab(this.tab);
+
+            emit(this, E_OPEN, this.tab);
+
+            this.browser.addEventListener('DOMContentLoaded', _onOpenReady, true);
         });
 
+        let _onOpenReady = bindListener(this, function(evt) {
+            this.browser.removeEventListener('DOMContentLoaded', _onOpenReady, true);
+            emit(this, E_OPEN_READY, this.tab);
+        });
+
+        this.container.addEventListener('TabOpen', _onOpen, true);
+        this.mainWindow.gBrowser.addTab();
+    },
+
+    close: function() {
+        let onClose = bindListener(this, function() {
+            this.container.removeEventListener('TabClose', onClose, true);
+            this._browser = null;
+            this._tab = null;
+            emit(this, E_CLOSE);
+        });
+
+        if (this.tab) {
+            this._cleanUp();
+            this.container.addEventListener('TabClose', onClose, true);
+            getOwnerWindow(this.tab).gBrowser.removeTab(this.tab);
+        }
+        else {
+            emit(this, E_CLOSE);
+        }
+    },
+
+    load: function(url) {
+        let _ready = bindListener(this, function() {
+            this.browser.removeEventListener('DOMContentLoaded', _ready, true);
+            _load();
+        });
+
+        let netLogOptions = {
+            onRequest: function(request) {
+                emit(this, E_RES_REQ, request);
+            }.bind(this),
+
+            onResponse: function(response) {
+                emit(this, E_RES_REC, response);
+            }.bind(this),
+
+            onModifyRequest: function(subject) {
+                emit(this, E_REQUEST, subject);
+            }.bind(this),
+
+            onExamineResponse: function(subject) {
+                emit(this, E_RESPONSE, subject);
+            }.bind(this)
+        };
+
+
+        let progressOptions = {
+            onLoadStarted: function() {
+                emit(this, E_LOAD_START);
+            }.bind(this),
+
+            onTransferStarted: function() {
+                emit(this, E_START);
+            }.bind(this),
+
+            onContentLoaded: function(status) {
+                if (this._timeout) {
+                    clearTimeout(this._timeout);
+                    this._timeout = null;
+                }
+
+                if (status) {
+                    emit(this, E_READY);
+                    this._timeout = setTimeout(loadWait, this.options.loadTimeout);
+                }
+            }.bind(this),
+
+            onLoadFinished: function(status) {
+                if (this._timeout) {
+                    clearTimeout(this._timeout);
+                    this._timeout = null;
+                }
+
+                if (!status) {
+                    emit(this, E_LOAD_FAIL, 'Unable to open URL');
+                }
+                else {
+                    emit(this, E_LOAD);
+                    setTimeout(fullLoad, this.options.loadWait);
+                }
+            }.bind(this),
+
+            onStateChange: function(progress, request, flags, status, isMain) {
+                //if (isMain) console.log(this.debugFlags(flags))
+            }
+        };
+
+        let startWait = function() {
+            emit(this, E_LOAD_FAIL, 'Start timeout');
+        }.bind(this);
+
+        let loadWait = function() {
+            emit(this, E_LOAD_FAIL, 'Load timeout');
+        }.bind(this);
+
+        let fullLoad = function() {
+            emit(this, E_FULL_LOAD);
+        }.bind(this);
+
+        let _load = function() {
+            NetLog.registerBrowser(this.browser, netLogOptions);
+
+            this.browser.stop();
+            this._timeout = setTimeout(startWait, this.options.startTimeout);
+            PageProgress.registerBrowser(this.browser, progressOptions);
+
+            // Load page
+            emit(this, E_INIT);
+            this.browser.loadURIWithFlags(url, LOAD_FLAGS, null, null, null);
+        }.bind(this);
+
         this.browser.stop();
-        this.browser.addEventListener("DOMContentLoaded", _ready, true);
-        this.browser.loadURI("about:blank");
+        this.browser.addEventListener('DOMContentLoaded', _ready, true);
+        this.browser.loadURI('about:blank');
     }
-})
-exports.TabTrait = TabTrait;
+});
+
+exports.Tab = Tab;
 
 
-const registerBrowserNetLog = function(trait) {
-    netLog.registerBrowser(trait.browser, {
-        captureTypes: trait.options.captureTypes,
-        onRequest: function(request) {
-            trait._emit(E_RES_REQ, request);
-        },
-        onResponse: function(response) {
-            trait._emit(E_RES_REC, response);
-        },
-        _onRequest: function(subject) {
-            trait._emit(E_REQUEST, subject);
-        },
-        _onResponse: function(subject) {
-            trait._emit(E_RESPONSE, subject);
-        }
-    });
-};
-
-
-const ProgressListener = function(trait) {
-    this.trait = trait;
-
-    this.START = 1;
-    this.INIT = 2;
-    this.LOAD = 3;
-
-    this.state = 0;
-};
-ProgressListener.prototype = {
-    QueryInterface: function(aIID){
-        if (aIID.equals(Ci.nsIWebProgressListener) ||
-        aIID.equals(Ci.nsISupportsWeakReference) ||
-        aIID.equals(Ci.nsISupports))
-            return this;
-       throw(Cr.NS_NOINTERFACE);
-    },
-    isStart: function(flags) {
-        return (
-            flags & Ci.nsIWebProgressListener.STATE_TRANSFERRING &&
-            flags & Ci.nsIWebProgressListener.STATE_IS_DOCUMENT
-        );
-    },
-    isLoaded: function(flags) {
-        return (
-            flags & Ci.nsIWebProgressListener.STATE_STOP &&
-            flags & Ci.nsIWebProgressListener.STATE_IS_NETWORK &&
-            flags & Ci.nsIWebProgressListener.STATE_IS_WINDOW
-        );
-    },
-    isLoading: function(flags) {
-        return (
-            flags & Ci.nsIWebProgressListener.STATE_START &&
-            flags & Ci.nsIWebProgressListener.STATE_IS_WINDOW
-        )
-    },
-
-    onStateChange: function(progress, request, flags, status) {
+const bindListener = function(obj, listener) {
+    return function() {
         try {
-            if (this.isStart(flags) && this.state < this.START) {
-                this.state = this.START;
-                this.trait._emit(E_START);
-                return;
-            }
-            if (this.isLoading(flags) && this.state == this.START && this.state < this.INIT) {
-                this.state = this.INIT;
-                this.trait._emit(E_LOAD_START);
-                return;
-            }
-            if (this.isLoaded(flags) && this.state < this.START) {
-                this.trait.browser.removeProgressListener(this);
-                this.trait._emit(E_LOAD_FAIL, "Unable to open URL");
-                return;
-            }
-        } catch(e) {
-            this.trait._emit(E_LOAD_FAIL);
-            console.exception(e);
-            try {
-                this.trait.browser.removeProgressListener(this);
-            } catch(e) {
-                console.exception(e);
-            }
+            listener.apply(this, arguments);
         }
-    }
+        catch(e) {
+            emit(this, 'error', e);
+        }
+    }.bind(obj);
 };

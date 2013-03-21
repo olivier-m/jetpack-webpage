@@ -85,7 +85,7 @@ const ListenerTrait = function() {
         redir("resourceReceived");
 
         // loadFinished
-        this.trait.on("load", function() {
+        this.trait.on("fullLoad", function() {
             this._emit("loadFinished", "success");
         }.bind(this));
         this.trait.on("loadFail", function() {
@@ -228,7 +228,7 @@ const webPage = EventEmitter.compose(ListenerTrait(), WindowEventTrait(),
     },
 
     constructor: function(options) {
-        this.trait = tabs.TabTrait(options);
+        this.trait = tabs.Tab(options);
         this._state = "closed";
         this._sandbox = null;
         this._sandboxGlobals = null;
@@ -256,8 +256,8 @@ const webPage = EventEmitter.compose(ListenerTrait(), WindowEventTrait(),
 
         // Adding event to capture page content
         this.on("resourceReceived", function(response) {
-            if (this.trait.browser.contentWindow.location.href == response.url) {
-                this._plainText = response.body;
+            if (response.id === 0 && response.stage === 'data') {
+                this._plainText += response.data;
             }
         }.bind(this));
 
@@ -429,7 +429,7 @@ const webPage = EventEmitter.compose(ListenerTrait(), WindowEventTrait(),
             deferred.resolve("success");
         }.bind(this));
 
-        this.trait.once("loadFail", function() {
+        this.trait.once("loadFail", function(reason) {
             this._state = "complete";
             deferred.resolve("fail");
         }.bind(this));

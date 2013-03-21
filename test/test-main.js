@@ -2,7 +2,7 @@
 
 const Q = require("sdk/core/promise");
 const {URL} = require("sdk/url");
-const {readBinaryURI, registerFile, startServer} = require("net-log/test/utils");
+const {startServer} = require("webpage/test/tools");
 
 const webpage = require("webpage");
 
@@ -43,7 +43,7 @@ srv.registerPathHandler("/auth", function(request, response) {
 });
 
 const pageURL = function(path) {
-    return "http://localhost:" + port + path;
+    return "http://127.0.0.1:" + port + path;
 };
 
 
@@ -271,7 +271,7 @@ exports["test cookies"] = function(assert, done) {
     p1.addCookie({
         name: "test",
         value: "cookieTest",
-        domain: "localhost"
+        domain: "127.0.0.1"
     });
 
     let c1 = [];
@@ -292,9 +292,9 @@ exports["test cookies"] = function(assert, done) {
         assert.equal(c2.length, 0);
 
         assert.equal(p3.cookies.length, 1);
-        assert.equal(p3.cookies.toString(), "myCookie=foo-bar; domain=localhost; path=/cookie");
-        done();
-    });
+        assert.equal(p3.cookies.toString(), "myCookie=foo-bar; domain=127.0.0.1; path=/cookie");
+    })
+    .then(null, console.exception).then(done);
 };
 
 
