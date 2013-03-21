@@ -1,46 +1,47 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
-"use strict";
+'use strict';
 
-const base64 = require("sdk/base64");
-const {mix} = require("sdk/core/heritage");
-const Q = require("sdk/core/promise");
-const {getBrowserForTab, getOwnerWindow} = require("sdk/tabs/utils");
-const {setTimeout} = require("sdk/timers");
-const {descriptor} = require("toolkit/loader");
+const base64 = require('sdk/base64');
+const {mix} = require('sdk/core/heritage');
+const Q = require('sdk/core/promise');
+const {getBrowserForTab} = require('sdk/tabs/utils');
+const {setTimeout} = require('sdk/timers');
+const {descriptor} = require('toolkit/loader');
 
-const {validateOptions} = require("sdk/deprecated/api-utils");
-const {EventEmitter} = require("sdk/deprecated/events");
-const {Trait} = require("sdk/deprecated/traits");
+const {validateOptions} = require('sdk/deprecated/api-utils');
+const {EventEmitter} = require('sdk/deprecated/events');
+const {Trait} = require('sdk/deprecated/traits');
 
-const {tabSandbox} = require("./sandbox");
-const tabs = require("./tabs");
+const {tabSandbox} = require('./sandbox');
+const tabs = require('./tabs');
 const {
     discardSTSInfo, getScreenshotCanvas, setAuthHeaders, removeAuthPrompt,
     getCookies, setCookies, Cookie
-} = require("./utils");
+} = require('./utils');
+
 
 const ListenerTrait = function() {
     // PhantomJS callback we can convert to events
     const EVENTS = [
-        "callback",               // MAYBE
-        "closing",
-        "error",
-        "initialized",
-        "loadFinished",
-        "loadStarted",
-        "navigationRequested",    // TODO
-        "pageCreated",            // TODO
-        "resourceRequested",
-        "resourceReceived",
-        "urlChanged"              // TODO
+        'callback',               // MAYBE
+        'closing',
+        'error',
+        'initialized',
+        'loadFinished',
+        'loadStarted',
+        'navigationRequested',    // TODO
+        'pageCreated',            // TODO
+        'resourceRequested',
+        'resourceReceived',
+        'urlChanged'              // TODO
     ];
 
     let trait = {};
 
     let getName = function(v) {
-        return "on" + v[0].toUpperCase() + v.substr(1);
+        return 'on' + v[0].toUpperCase() + v.substr(1);
     };
 
     let callbackListener = function(v) {
@@ -49,7 +50,7 @@ const ListenerTrait = function() {
         this.on(v, function() {
             let args = Array.prototype.slice.call(arguments);
             let name = args.shift();
-            if (typeof(this[name]) === "function") {
+            if (typeof(this[name]) === 'function') {
                 this[name].apply(this, args);
             }
         }.bind(this, getName(v)));
@@ -77,25 +78,25 @@ const ListenerTrait = function() {
         // Some redirects
         let redir = redirectListener.bind(this);
 
-        redir("error");
-        redir("openReady", "initialized");
-        redir("start", "loadStarted");
-        redir("ready", "loadContent");
-        redir("resourceRequested");
-        redir("resourceReceived");
+        redir('error');
+        redir('openReady', 'initialized');
+        redir('start', 'loadStarted');
+        redir('ready', 'loadContent');
+        redir('resourceRequested');
+        redir('resourceReceived');
 
         // loadFinished
-        this.trait.on("fullLoad", function() {
-            this._emit("loadFinished", "success");
+        this.trait.on('fullLoad', function() {
+            this._emit('loadFinished', 'success');
         }.bind(this));
-        this.trait.on("loadFail", function() {
-            this._emit("loadFinished", "fail");
+        this.trait.on('loadFail', function() {
+            this._emit('loadFinished', 'fail');
         }.bind(this));
     };
 
     // Default onError callback
     trait.onError = function(e) {
-        console.error("ERROR");
+        console.error('ERROR');
         console.exception(e);
     };
 
@@ -116,8 +117,8 @@ const WindowEventTrait = function() {
 
     let callbackMethod = function(k, v) {
         this[k] = v;
-        this["_" + k] = function() {
-            if (typeof(this[k]) === "function") {
+        this['_' + k] = function() {
+            if (typeof(this[k]) === 'function') {
                 return this[k].apply(this, arguments);
             }
         }.bind(this);
@@ -136,7 +137,7 @@ const WindowEventTrait = function() {
                 __noSuchMethod__: function(id, args) {
                     return this._onConsoleMessage(id, args);
                 }.bind(this),
-                __exposedProps__: {__noSuchMethod__: "r"}
+                __exposedProps__: {__noSuchMethod__: 'r'}
             },
             dump: this._onConsoleMessage.bind(this),
 
@@ -159,7 +160,7 @@ const WindowEventTrait = function() {
         }
 
         // Window object modifications
-        this.trait.on("start", function() {
+        this.trait.on('start', function() {
             Object.defineProperties(
                 this._tab.linkedBrowser.contentWindow.wrappedJSObject,
                 descriptor(this._windowEvents())
@@ -168,10 +169,10 @@ const WindowEventTrait = function() {
 
         // Default console message
         this.onConsoleMessage = function(id, args) {
-            if (id === "log") {
-                id = "info";
+            if (id === 'log') {
+                id = 'info';
             }
-            dump(id + ": " + args.join(" ") + "\n");
+            dump(id + ': ' + args.join(' ') + '\n');
         };
     };
 
@@ -187,7 +188,7 @@ const webPage = EventEmitter.compose(ListenerTrait(), WindowEventTrait(),
 
     _assertTab: function() {
         if (!this._tab) {
-            throw new Error("webpage not opened");
+            throw new Error('webpage not opened');
         }
     },
     get _tab() {
@@ -216,20 +217,20 @@ const webPage = EventEmitter.compose(ListenerTrait(), WindowEventTrait(),
     },
     set globals(value) {
         if (this._sandbox !== null) {
-            throw new Error("Cannot add globals after the first evaluation call");
+            throw new Error('Cannot add globals after the first evaluation call');
         }
         this._sandboxGlobals = value;
     },
 
     _cleanUp: function() {
         // Init & clean some vars
-        this._plainText = "";
+        this._plainText = '';
         this._sandbox = null;
     },
 
     constructor: function(options) {
         this.trait = tabs.Tab(options);
-        this._state = "closed";
+        this._state = 'closed';
         this._sandbox = null;
         this._sandboxGlobals = null;
 
@@ -255,13 +256,13 @@ const webPage = EventEmitter.compose(ListenerTrait(), WindowEventTrait(),
         this._registerWindowEvents();
 
         // Adding event to capture page content
-        this.on("resourceReceived", function(response) {
+        this.on('resourceReceived', function(response) {
             if (response.id === 0 && response.stage === 'data') {
                 this._plainText += response.data;
             }
         }.bind(this));
 
-        this.trait.on("_request", function(request) {
+        this.trait.on('_request', function(request) {
             // Set authorization
             setAuthHeaders(request, this.url, this.settings.userName, this.settings.password);
 
@@ -269,7 +270,7 @@ const webPage = EventEmitter.compose(ListenerTrait(), WindowEventTrait(),
             setCookies(request, this._cookies);
         }.bind(this));
 
-        this.trait.on("_response", function(response) {
+        this.trait.on('_response', function(response) {
             // Remove STS information on each response for tab
             discardSTSInfo(response);
 
@@ -288,7 +289,7 @@ const webPage = EventEmitter.compose(ListenerTrait(), WindowEventTrait(),
     foreground: function() {
         this._assertTab();
         let deferred = Q.defer();
-        this.trait.once("select", function() {
+        this.trait.once('select', function() {
             deferred.resolve();
         });
         this.trait.select();
@@ -323,7 +324,8 @@ const webPage = EventEmitter.compose(ListenerTrait(), WindowEventTrait(),
             values.forEach(function(v) {
                 this.addCookie(v);
             });
-        } catch(e) {
+        }
+        catch(e) {
             this._cookies = old;
             throw e;
         }
@@ -335,29 +337,30 @@ const webPage = EventEmitter.compose(ListenerTrait(), WindowEventTrait(),
     set clipRect(value) {
         let requirements = {
             top: {
-                is: ["number"],
+                is: ['number'],
                 ok: function(val) val >= 0,
-                msg: "top should be a positive integer"
+                msg: 'top should be a positive integer'
             },
             left: {
-                is: ["number"],
+                is: ['number'],
                 ok: function(val) val >= 0,
-                msg: "left should be a positive integer"
+                msg: 'left should be a positive integer'
             },
             width: {
-                is: ["number"],
+                is: ['number'],
                 ok: function(val) val > 0,
-                msg: "width should be a positive integer"
+                msg: 'width should be a positive integer'
             },
             height: {
-                is: ["number"],
+                is: ['number'],
                 ok: function(val) val > 0,
-                msg: "height should be a positive integer"
+                msg: 'height should be a positive integer'
             },
         }
-        if (typeof(value) === "object") {
+        if (typeof(value) === 'object') {
             this._clipRect = validateOptions(value, requirements);
-        } else {
+        }
+        else {
             this._clipRect = null;
         }
     },
@@ -370,18 +373,19 @@ const webPage = EventEmitter.compose(ListenerTrait(), WindowEventTrait(),
                 window.onunload = null;
             });
 
-            this.trait.once("close", function() {
-                this._emit("closing", this);
+            this.trait.once('close', function() {
+                this._emit('closing', this);
                 deferred.resolve(true);
             }.bind(this));
             this.trait.close();
-        } else {
+        }
+        else {
             // XXX: Don't know if it's a good idea to send event even if tab if closed.
-            this._emit("closing", this);
+            this._emit('closing', this);
             deferred.resolve(false);
         }
         this._cleanUp();
-        this._state = "closed";
+        this._state = 'closed';
 
         return deferred.promise;
     },
@@ -409,52 +413,54 @@ const webPage = EventEmitter.compose(ListenerTrait(), WindowEventTrait(),
         try {
             this.sandbox.injectJS(filename);
             return true;
-        } catch(e) {
-            this._emit("error", e);
+        }
+        catch(e) {
+            this._emit('error', e);
             return false;
         }
     },
 
     open: function(url, callback) {
-        if (this._state == "transfer") {
-            throw new Error("Transfer in progress");
+        if (this._state == 'transfer') {
+            throw new Error('Transfer in progress');
         }
         this._cleanUp();
-        this._state = "transfer";
+        this._state = 'transfer';
 
         let deferred = Q.defer();
 
-        this.trait.once("fullLoad", function() {
-            this._state = "complete";
-            deferred.resolve("success");
+        this.trait.once('fullLoad', function() {
+            this._state = 'complete';
+            deferred.resolve('success');
         }.bind(this));
 
-        this.trait.once("loadFail", function(reason) {
-            this._state = "complete";
-            deferred.resolve("fail");
+        this.trait.once('loadFail', function(reason) {
+            this._state = 'complete';
+            deferred.resolve('fail');
         }.bind(this));
 
-        this.trait.once("error", function() {
-            this._state = "complete";
-            deferred.resolve("fail");
+        this.trait.once('error', function() {
+            this._state = 'complete';
+            deferred.resolve('fail');
         }.bind(this));
 
         if (!this._tab) {
-            this.trait.once("openReady", function() {
+            this.trait.once('openReady', function() {
                 this.trait.load(url);
             }.bind(this));
             this.trait.open();
-        } else {
+        }
+        else {
             this.trait.load(url);
         }
 
         deferred.promise.then(function(result) {
-            this._emit("openFinished", result);
+            this._emit('openFinished', result);
         }.bind(this));
 
-        if (typeof(callback) === "function") {
+        if (typeof(callback) === 'function') {
             deferred.promise.then(callback).then(null, function(e) {
-                this._emit("error", e);
+                this._emit('error', e);
             }.bind(this));
         };
 
@@ -462,7 +468,7 @@ const webPage = EventEmitter.compose(ListenerTrait(), WindowEventTrait(),
     },
 
     render: function(filename, ratio) {
-        throw new Error("Not implemented yet");
+        throw new Error('Not implemented yet');
     },
 
     renderBytes: function(format, ratio) {
@@ -472,31 +478,34 @@ const webPage = EventEmitter.compose(ListenerTrait(), WindowEventTrait(),
     renderBase64: function(format, ratio) {
         this._assertTab();
 
-        format = (format || "png").toString().toLowerCase();
+        format = (format || 'png').toString().toLowerCase();
         let qual = undefined;
-        if (format == "png") {
-            format = "image/png";
-        } else if (format == "jpeg") {
-            format = "image/jpeg";
+        if (format == 'png') {
+            format = 'image/png';
+        }
+        else if (format == 'jpeg') {
+            format = 'image/jpeg';
             qual = 0.8;
-        } else {
-            throw new Error("Render format \"" + format + "\" is not supported");
+        }
+        else {
+            throw new Error('Render format "' + format + '" is not supported');
         }
 
         let window = getBrowserForTab(this._tab).contentWindow;
 
         let canvas = getScreenshotCanvas(window, this.clipRect, ratio);
 
-        return canvas.toDataURL(format, qual).split(",", 2)[1];
+        return canvas.toDataURL(format, qual).split(',', 2)[1];
     },
 
     get plainText() {
         this._assertTab();
         try {
             return this._plainText;
-        } catch(e) {
-            this._emit("error", e);
-            return "";
+        }
+        catch(e) {
+            this._emit('error', e);
+            return '';
         }
     },
 
@@ -504,7 +513,7 @@ const webPage = EventEmitter.compose(ListenerTrait(), WindowEventTrait(),
         return this._settings;
     },
     set settings(val) {
-        if (typeof(val) === "object") {
+        if (typeof(val) === 'object') {
             this._settings = mix(this._settings, val);
         }
     },
