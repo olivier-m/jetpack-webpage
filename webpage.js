@@ -195,6 +195,9 @@ const webPage = EventEmitter.compose(ListenerTrait(), WindowEventTrait(),
     get _tab() {
         return this.trait.tab;
     },
+    get browser() {
+        return this.trait.browser;
+    },
 
     get sandbox() {
         this._assertTab();
@@ -225,6 +228,14 @@ const webPage = EventEmitter.compose(ListenerTrait(), WindowEventTrait(),
 
     _cleanUp: function() {
         // Init & clean some vars
+        //if (this._sandbox !== null) console.log(Object.keys(this._sandbox));
+        if (this._sandbox && typeof(this._sandbox.sandbox) === 'object') {
+            for (var i in this._sandbox.sandbox) {
+                delete this._sandbox.sandbox[i];
+            }
+            //this._sandbox.sandbox = null;
+            delete this._sandbox.sandbox;
+        }
         this._plainText = '';
         this._sandbox = null;
     },
@@ -376,6 +387,7 @@ const webPage = EventEmitter.compose(ListenerTrait(), WindowEventTrait(),
 
             this.trait.once('close', function() {
                 this._emit('closing', this);
+                this._cleanUp();
                 deferred.resolve(true);
             }.bind(this));
             this.trait.close();
