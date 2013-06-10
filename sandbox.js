@@ -12,7 +12,7 @@ const timers = require("sdk/timers");
 
 const tabSandbox = function(tab) {
     let win = tab.linkedBrowser.contentWindow;
-    this.sandbox = sandbox.sandbox(win, {
+    this.sandbox = sandbox.sandbox(null, {
         sandboxPrototype: win,
         wantXrays: false,
         wantComponents: false
